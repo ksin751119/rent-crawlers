@@ -4,6 +4,11 @@ for personal usage.
 
 ## required
 
+* python-dotenv
+* selenium
+* bs4
+* pandas
+
 ### env
 ```
 591_PHPSESSID=xxxxxx
