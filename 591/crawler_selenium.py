@@ -1,10 +1,39 @@
 import pandas as pd
 import os
+import time
 from dotenv import load_dotenv
 from selenium import webdriver
 from bs4 import BeautifulSoup
 load_dotenv()
 
+def generate_area_text(area_element):
+    if area_element is None:
+        return ""
+    items = area_element.select("i")
+    return sort_element_by_style_order(items)
+def generate_floor_text(floor_element):
+    if floor_element is None:
+        return ""
+    items = floor_element.select("i")
+    return sort_element_by_style_order(items)
+def generate_price_text(price_element):
+    if price_element is None:
+        return ""
+    items = price_element.select("i")
+    return sort_element_by_style_order(items)
+def generate_address_text(address_element):
+    if address_element is None:
+        return ""
+    items: list = address_element.select("i")
+    items.pop(0)
+    return sort_element_by_style_order(items)
+def sort_element_by_style_order(elements: list):
+    def sort_fn(x: str):
+        order_value = x['style'].split(':')[1].split(';')[0]
+        return int(order_value)
+    sorted_items = sorted(elements, key=sort_fn)
+    result = ''.join([item.text for item in sorted_items])
+    return result
 def render_images(image_list):
     return ''.join([f'<img src="{img}" width="100" />' for img in image_list])
 def render_link(link, title):
@@ -49,10 +78,14 @@ def write_normal(soup):
         title = item.select_one('a.link').text
         link = item.select_one('a.link')['href']
         area_and_floor = item.select('span.line')
-        area = next((span for span in area_and_floor if "坪" in span.get_text()), None).get_text()
-        floor = next((span for span in area_and_floor if "F" in span.get_text()), None).get_text()
-        address = item.select_one('div.item-info-txt').text
-        price = item.select_one('div.item-info-price').text
+        area_data = area_and_floor[0]
+        floor_data = area_and_floor[1]
+        address_data = item.select('.item-info-txt')[1]
+        price_data = item.select_one('div.item-info-price')
+        area = generate_area_text(area_data)
+        floor = generate_floor_text(floor_data)
+        address = generate_address_text(address_data)
+        price = generate_price_text(price_data)
         data.append([title, price, address, floor, area, image_lst, link])
     df = pd.DataFrame(data, columns=columns)
     df['images'] = df['images'].apply(render_images)
@@ -64,6 +97,8 @@ def main():
     driver.implicitly_wait(10)
     start_url = os.getenv('591_FILTER_URL')
     soup = get_page_content(driver, start_url)
+    print('waiting 1 sec for page to load')
+    time.sleep(1)
     write_recommends(soup)
     write_normal(soup)
 
