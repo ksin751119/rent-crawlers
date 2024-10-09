@@ -94,8 +94,6 @@ def write_normal(driver, soup, start_url):
         print(f'successfully crawl page: {page}')
         page += 1
         soup = get_page_content(driver, start_url + f'&page={page}')
-        print('waiting 1 sec for page to load')
-        time.sleep(1)
     columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
     df = pd.DataFrame(data, columns=columns)
     df['images'] = df['images'].apply(render_images)
@@ -108,8 +106,6 @@ def main():
     driver.implicitly_wait(10)
     start_url = os.getenv('591_FILTER_URL')
     soup = get_page_content(driver, start_url)
-    print('waiting 1 sec for page to load')
-    time.sleep(1)
     write_recommends(soup)
     write_normal(driver, soup, start_url)
 
