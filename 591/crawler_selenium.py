@@ -66,32 +66,43 @@ def write_recommends(soup):
     df['link'] = df.apply(lambda x: render_link(x['link'], x['title']), axis=1)
     html_output = df.to_html(escape=False)
     write_html(html_output, '591recommend.html')
-def write_normal(soup):
-    columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
+def write_normal(driver, soup, start_url):
+    def get_normal_items(soup):
+        items = soup.select('.list-wrapper .item')
+        for item in items:
+            image_lst = []
+            images = item.select('img[alt="物件圖片"]')
+            for image in images:
+                image_lst.append(image['data-src'])
+            title = item.select_one('a.link').text
+            link = item.select_one('a.link')['href']
+            area_and_floor = item.select('span.line')
+            area_data = area_and_floor[0]
+            floor_data = area_and_floor[1]
+            address_data = item.select('.item-info-txt')[1]
+            price_data = item.select_one('div.item-info-price')
+            area = generate_area_text(area_data)
+            floor = generate_floor_text(floor_data)
+            address = generate_address_text(address_data)
+            price = generate_price_text(price_data)
+            data.append([title, price, address, floor, area, image_lst, link])
     data = []
-    items = soup.select('.list-wrapper .item')
-    for item in items:
-        image_lst = []
-        images = item.select('img[alt="物件圖片"]')
-        for image in images:
-            image_lst.append(image['data-src'])
-        title = item.select_one('a.link').text
-        link = item.select_one('a.link')['href']
-        area_and_floor = item.select('span.line')
-        area_data = area_and_floor[0]
-        floor_data = area_and_floor[1]
-        address_data = item.select('.item-info-txt')[1]
-        price_data = item.select_one('div.item-info-price')
-        area = generate_area_text(area_data)
-        floor = generate_floor_text(floor_data)
-        address = generate_address_text(address_data)
-        price = generate_price_text(price_data)
-        data.append([title, price, address, floor, area, image_lst, link])
+    page = 1
+    while soup.select_one('.empty') is None:
+        print(f'getting page {page}')
+        get_normal_items(soup)
+        print(f'successfully crawl page: {page}')
+        page += 1
+        soup = get_page_content(driver, start_url + f'&page={page}')
+        print('waiting 1 sec for page to load')
+        time.sleep(1)
+    columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
     df = pd.DataFrame(data, columns=columns)
     df['images'] = df['images'].apply(render_images)
     df['link'] = df.apply(lambda x: render_link(x['link'], x['title']), axis=1)
     html_output = df.to_html(escape=False)
     write_html(html_output, '591normal.html')
+    print('write normal done')
 def main():
     driver = webdriver.Chrome()
     driver.implicitly_wait(10)
@@ -100,6 +111,6 @@ def main():
     print('waiting 1 sec for page to load')
     time.sleep(1)
     write_recommends(soup)
-    write_normal(soup)
+    write_normal(driver, soup, start_url)
 
 main()
