@@ -1,9 +1,10 @@
-import pandas as pd
+import sys
 import os
 import time
+import pandas as pd
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
-from selenium import webdriver
-from bs4 import BeautifulSoup
+from libs.utils import get_page_content, write_file, use_selenium
 load_dotenv()
 
 def generate_area_text(area_element):
@@ -38,14 +39,6 @@ def render_images(image_list):
     return ''.join([f'<img src="{img}" width="100" />' for img in image_list])
 def render_link(link, title):
     return f'<a href="{link}" target="_blank">{title}</a>'
-def get_page_content(driver, url):
-    driver.get(url)
-    print('getting page content of title: ', driver.title)
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    return soup
-def write_html(html_output, file_name):
-    with open(f'temp/{file_name}', 'w') as f:
-        f.write(html_output)
 def write_recommends(soup):
     columns = ['title', 'price', 'address', 'area', 'images', 'link']
     data = []
@@ -62,10 +55,12 @@ def write_recommends(soup):
         link = content.select_one('a.title')['href']
         data.append([title, price, address, area, image_lst, link])
     df = pd.DataFrame(data, columns=columns)
+    json_output = df.to_json(orient='records')
+    write_file(json_output, '591recommend.json')
     df['images'] = df['images'].apply(render_images)
     df['link'] = df.apply(lambda x: render_link(x['link'], x['title']), axis=1)
     html_output = df.to_html(escape=False)
-    write_html(html_output, '591recommend.html')
+    write_file(html_output, '591recommend.html')
 def write_normal(driver, soup, start_url):
     def get_normal_items(soup):
         items = soup.select('.list-wrapper .item')
@@ -97,16 +92,18 @@ def write_normal(driver, soup, start_url):
         time.sleep(1)
     columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
     df = pd.DataFrame(data, columns=columns)
+    json_output = df.to_json(orient='records')
+    write_file(json_output, '591normal.json')
     df['images'] = df['images'].apply(render_images)
     df['link'] = df.apply(lambda x: render_link(x['link'], x['title']), axis=1)
     html_output = df.to_html(escape=False)
-    write_html(html_output, '591normal.html')
+    write_file(html_output, '591normal.html')
     print('write normal done')
 def main():
-    driver = webdriver.Chrome()
-    driver.implicitly_wait(10)
+    driver = use_selenium()
     start_url = os.getenv('591_FILTER_URL')
     soup = get_page_content(driver, start_url)
+    time.sleep(1)
     write_recommends(soup)
     write_normal(driver, soup, start_url)
 

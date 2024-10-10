@@ -31,7 +31,7 @@ for personal usage.
 4. Open terminal and enter this command:
 
 ```
-python3 591/crawler_selenium.py
+python3 app/591/crawler_selenium.py
 ```
 
 5. Result file will be located at: `temp/591recommend.html` and `temp/591normal.html`
