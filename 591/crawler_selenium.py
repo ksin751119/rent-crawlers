@@ -94,6 +94,7 @@ def write_normal(driver, soup, start_url):
         print(f'successfully crawl page: {page}')
         page += 1
         soup = get_page_content(driver, start_url + f'&page={page}')
+        time.sleep(1)
     columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
     df = pd.DataFrame(data, columns=columns)
     df['images'] = df['images'].apply(render_images)
