@@ -1,3 +1,5 @@
+static/*.html
+static/*.json
 temp/
 __pycache__/
 chromedriver

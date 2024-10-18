@@ -34,4 +34,4 @@ for personal usage.
 python3 app/five_nine_one/crawler_selenium.py
 ```
 
-5. Result file will be located at: `temp/591recommend.html` and `temp/591normal.html`
+5. Result file will be located at: `static/591recommend.html` and `static/591normal.html`

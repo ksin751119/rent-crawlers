@@ -1,8 +1,10 @@
 from typing import Union
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from app.five_nine_one.helpers.get_content import get_content
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 def read_root():
