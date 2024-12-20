@@ -2,6 +2,10 @@
 
 for personal usage.
 
+## Notes
+
+* 2024-12-20: 修正爬蟲可能被導向空白頁的問題
+
 ## required
 
 ### packages or libs
