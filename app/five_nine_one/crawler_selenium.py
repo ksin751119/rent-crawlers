@@ -5,6 +5,10 @@ import pandas as pd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 from libs.utils import get_page_content, write_file, use_selenium
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+import requests
 load_dotenv()
 
 def generate_area_text(area_element):
@@ -39,66 +43,112 @@ def render_images(image_list):
     return ''.join([f'<img src="{img}" width="100" />' for img in image_list])
 def render_link(link, title):
     return f'<a href="{link}" target="_blank">{title}</a>'
+
+def get_google_sheets_service():
+    """建立 Google Sheets API 服務連線"""
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+    creds = service_account.Credentials.from_service_account_file(
+        os.getenv('GOOGLE_KEY_FILE'),  # 請替換成您的憑證檔案路徑
+        scopes=SCOPES
+    )
+    return build('sheets', 'v4', credentials=creds)
+
+def read_sheet_data(service):
+    """讀取 Google Sheet 資料"""
+    SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')  # 請替換成您的試算表 ID
+    RANGE_NAME = '591Rent!A:G'  # 調整範圍
+
+    result = service.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range=RANGE_NAME
+    ).execute()
+    return result.get('values', [])
+
+def update_sheet_data(service, new_data):
+    """更新 Google Sheet 資料"""
+    SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
+    RANGE_NAME = '591Rent!A:G'  # 調整範圍
+
+    body = {
+        'values': new_data
+    }
+    service.spreadsheets().values().append(
+        spreadsheetId=SPREADSHEET_ID,
+        range=RANGE_NAME,
+        valueInputOption='RAW',
+        insertDataOption='INSERT_ROWS',
+        body=body
+    ).execute()
+
+def send_line_notification(message):
+    """發送 Line 通知"""
+    LINE_NOTIFY_TOKEN = os.getenv('LINE_NOTIFY_TOKEN')
+    url = 'https://notify-api.line.me/api/notify'
+    headers = {'Authorization': f'Bearer {LINE_NOTIFY_TOKEN}'}
+    data = {'message': message}
+    print("data", data)
+    requests.post(url, headers=headers, data=data)
+
+def extract_house_id(url):
+    """從 URL 中提取房屋 ID"""
+    # print("url", url)
+    return url.split('/')[-1]
+
 def write_recommends(soup):
-    columns = ['title', 'price', 'address', 'area', 'images', 'link']
+    columns = ['title', 'price', 'address', 'area', 'link']
     data = []
     recommendWares = soup.select('div.recommend-ware')
     for content in recommendWares:
-        title = content.select_one('a.title').text
-        price = content.select_one('div.price-info').text
-        address = content.select_one('span.address').text
-        area = content.select_one('span.area').text
-        image_lst = []
-        images = content.select('img[alt="物件圖片"]')
-        for image in images:
-            image_lst.append(image['data-src'])
-        link = content.select_one('a.title')['href']
-        data.append([title, price, address, area, image_lst, link])
+        house = {
+            "title": content.select_one('a.title').text,
+            "price": content.select_one('div.price-info').text,
+            "address": content.select_one('span.address').text,
+            "area": content.select_one('span.area').text,
+            "link": content.select_one('a.title')['href'].replace('\/', '/')
+        }
+        data.append(house)
     df = pd.DataFrame(data, columns=columns)
     json_output = df.to_json(orient='records')
     write_file(json_output, '591recommend.json')
-    df['images'] = df['images'].apply(render_images)
-    df['link'] = df.apply(lambda x: render_link(x['link'], x['title']), axis=1)
-    html_output = df.to_html(escape=False)
-    write_file(html_output, '591recommend.html')
+    return data
+
+
 def write_normal(driver, soup, start_url):
-    def get_normal_items(soup):
-        items = soup.select('.list-wrapper .item')
-        for item in items:
-            image_lst = []
-            images = item.select('img[alt="物件圖片"]')
-            for image in images:
-                image_lst.append(image['data-src'])
-            title = item.select_one('a.link').text
-            link = item.select_one('a.link')['href']
-            area_and_floor = item.select('span.line')
-            area_data = area_and_floor[0]
-            floor_data = area_and_floor[1]
-            address_data = item.select('.item-info-txt')[1]
-            price_data = item.select_one('div.item-info-price')
-            area = generate_area_text(area_data)
-            floor = generate_floor_text(floor_data)
-            address = generate_address_text(address_data)
-            price = generate_price_text(price_data)
-            data.append([title, price, address, floor, area, image_lst, link])
+    columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
     data = []
     page = 1
+
     while soup.select_one('.empty') is None:
         print(f'getting page {page}')
-        get_normal_items(soup)
+        items = soup.select('.list-wrapper .item')
+
+        for item in items:
+            image_lst = [img['data-src'] for img in item.select('img[alt="物件圖片"]')]
+
+            house = {
+                "title": item.select_one('a.link').text,
+                "price": generate_price_text(item.select_one('div.item-info-price')),
+                "address": generate_address_text(item.select('.item-info-txt')[1]),
+                "floor": generate_floor_text(item.select('span.line')[1]),
+                "area": generate_area_text(item.select('span.line')[0]),
+                # "images": image_lst,
+                "link": item.select_one('a.link')['href']
+            }
+            data.append(house)
+
         print(f'successfully crawl page: {page}')
         page += 1
         soup = get_page_content(driver, start_url + f'&page={page}')
         time.sleep(1)
-    columns = ['title', 'price', 'address', 'floor', 'area', 'images', 'link']
+
     df = pd.DataFrame(data, columns=columns)
     json_output = df.to_json(orient='records')
     write_file(json_output, '591normal.json')
-    df['images'] = df['images'].apply(render_images)
-    df['link'] = df.apply(lambda x: render_link(x['link'], x['title']), axis=1)
-    html_output = df.to_html(escape=False)
-    write_file(html_output, '591normal.html')
-    print('write normal done')
+
+
+
+    return data
+
 def main():
     driver = use_selenium()
     start_url = os.getenv('591_FILTER_URL')
@@ -109,7 +159,43 @@ def main():
         sys.exit()
     soup = get_page_content(driver, start_url)
     time.sleep(1)
-    write_recommends(soup)
-    write_normal(driver, soup, start_url)
+    # rental_houses =write_recommends(soup)
+    rental_houses =write_normal(driver, soup, start_url)
+
+
+    # # 取得 Google Sheets 服務
+    sheets_service = get_google_sheets_service()
+
+    # # 讀取現有的 Sheet 資料
+    existing_data = read_sheet_data(sheets_service)
+    # print("existing_data", existing_data)
+    existing_ids = set(extract_house_id(row[4]) for row in existing_data[1:] if len(row) > 4)  # E 欄位是 link
+    # print("existing_ids", existing_ids)
+
+
+
+    # print("existing_ids", existing_ids)
+    # 過濾新的物件
+    new_items = []
+    for row in rental_houses:
+        # print ("row", row)
+        house_id = extract_house_id(row["link"])
+        # print("house_id", house_id)
+        if house_id not in existing_ids:
+            new_items.append([
+                row["title"],
+                row["price"],
+                row["address"],
+                row["area"],
+                row["link"]
+            ])
+
+            message = f"\n找到新物件！\n標題：{row['title']}\n連結：{row['link']}"
+            send_line_notification(message)
+
+    print("new_items", len(new_items))
+    if new_items:
+        update_sheet_data(sheets_service, new_items)
+
 
 main()
