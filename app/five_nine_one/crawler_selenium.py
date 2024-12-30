@@ -104,7 +104,7 @@ def write_recommends(soup):
             "price": content.select_one('div.price-info').text,
             "address": content.select_one('span.address').text,
             "area": content.select_one('span.area').text,
-            "link": content.select_one('a.title')['href'].replace('\/', '/')
+            "link": content.select_one('a.title')['href'].replace('/', '/')
         }
         data.append(house)
     df = pd.DataFrame(data, columns=columns)

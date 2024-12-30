@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import time
 
@@ -23,8 +24,19 @@ def write_file(output, file_name):
         return True
 
 def use_selenium():
-    options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # 無頭模式
+    options = Options()
+    options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    return webdriver.Chrome(options=options)
+
+    # 使用 ChromeDriver Manager 自動管理 driver
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
+
+    try:
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        return driver
+    except Exception as e:
+        print(f"Chrome 瀏覽器初始化失敗: {str(e)}")
+        raise
