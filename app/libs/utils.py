@@ -23,7 +23,8 @@ def write_file(output, file_name):
         return True
 
 def use_selenium():
-    options = use_disable_chrome_annoyings()
-    driver = webdriver.Chrome(options=options)
-    driver.implicitly_wait(10)
-    return driver
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')  # 無頭模式
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    return webdriver.Chrome(options=options)
